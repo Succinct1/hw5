@@ -55,6 +55,7 @@ endif
 
 # Try to infer the correct QEMU
 ifndef QEMU
+PATH := $(PATH):/home/cs5460/qemu-install/bin
 QEMU = $(shell if which qemu > /dev/null; \
 	then echo qemu; exit; \
 	elif which qemu-system-i386 > /dev/null; \

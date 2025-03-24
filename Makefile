@@ -55,6 +55,7 @@ endif
 
 # Try to infer the correct QEMU
 ifndef QEMU
+PATH := $(PATH):/home/cs5460/qemu-install/bin
 QEMU = $(shell if which qemu > /dev/null; \
 	then echo qemu; exit; \
 	elif which qemu-system-i386 > /dev/null; \
@@ -234,8 +235,17 @@ qemu-memfs: xv6memfs.img
 qemu-nox: fs.img xv6.img
 	$(QEMU) -nographic $(QEMUOPTS)
 
+.PHONY: .gdbinit
 .gdbinit: .gdbinit.tmpl
+	cp .gdbinit.tmpl .gdbinit
+	if [ -f ~/.gdbinit ]; then sed -i "s/# source/source/" ~/.gdbinit; fi
 	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
+
+launch.json: launch.json.tmpl
+	mkdir -p .vscode
+	if [ -f .gdbinit ]; then rm .gdbinit; fi
+	sed -i "s/^source/# source/" ~/.gdbinit
+	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > .vscode/$@
 
 qemu-gdb: fs.img xv6.img .gdbinit
 	@echo "*** Now run 'gdb'." 1>&2
@@ -243,6 +253,16 @@ qemu-gdb: fs.img xv6.img .gdbinit
 
 qemu-nox-gdb: fs.img xv6.img .gdbinit
 	@echo "*** Now run 'gdb'." 1>&2
+	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
+
+qemu-vscode: kernel fs.img xv6.img launch.json
+	@echo "*** Now attach to qemu in the debug console ofb vscode." 1>&2
+	@echo "file kernel" > .gdbinit
+	$(QEMU) -serial mon:stdio $(QEMUOPTS) -S $(QEMUGDB)
+
+qemu-nox-vscode: kernel fs.img xv6.img launch.json
+	@echo "*** Now attach to qemu in the debug console ofb vscode." 1>&2
+	@echo "file kernel" > .gdbinit
 	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
 
 # CUT HERE

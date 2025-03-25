@@ -81,7 +81,10 @@ CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb 
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
 # (CS6460) Fixes GCC 14
+GCC_VERSION := $(shell $(CC) -dumpversion | cut -f1 -d.)
+ifneq ($(filter 14,$(GCC_VERSION)),)
 CFLAGS += -Wno-error=array-bounds -Wno-error=infinite-recursion -mno-sse
+endif
 
 ASFLAGS = -m32 -gdwarf-2 -Wa,-divide
 # FreeBSD ld wants ``elf_i386_fbsd''

@@ -27,10 +27,17 @@
       # macOS: Don't build gdbserver - We only need to connect to QEMU's X86 gdbserver
       darwinGdb = (x86Pkgs.buildPackages.gdb.override {
         hostCpuOnly = true;
-      }).overrideAttrs (old: {
+      }).overrideAttrs (old: let
+        inherit (x86Pkgs.stdenv.cc) targetPrefix;
+      in {
         configureFlags = (old.configureFlags or []) ++ [
           "--enable-targets=${x86Pkgs.stdenv.targetPlatform.config}"
         ];
+        postInstall = (old.postInstall or "") + ''
+          if [[ -n "${targetPrefix}" ]]; then
+            ln -s "$out/bin/${targetPrefix}gdb" "$out/bin/gdb"
+          fi
+        '';
       });
     in if pkgs.stdenv.isDarwin then darwinGdb else pkgs.gdb;
   in {

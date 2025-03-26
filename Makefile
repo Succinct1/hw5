@@ -238,32 +238,24 @@ qemu-memfs: xv6memfs.img
 qemu-nox: fs.img xv6.img
 	$(QEMU) -nographic $(QEMUOPTS)
 
+# .gdbinit: has "target remote" command
+# .gdbinit.vscode: target specified in VSCode run config
 .PHONY: .gdbinit
 .gdbinit: .gdbinit.tmpl
 	cp .gdbinit.tmpl .gdbinit
-	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
+	cp .gdbinit.tmpl .gdbinit.vscode
+	echo "target remote localhost:$(GDBPORT)" >>.gdbinit
 
-launch.json: launch.json.tmpl
+launch.json: launch.json.tmpl .gdbinit
 	mkdir -p .vscode
-	if [ -f .gdbinit ]; then rm .gdbinit; fi
-	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > .vscode/$@
+	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $< > .vscode/$@
 
-qemu-gdb: fs.img xv6.img .gdbinit
-	@echo "*** Now run 'gdb'." 1>&2
+qemu-gdb: fs.img xv6.img .gdbinit launch.json
+	@echo "*** Now run 'gdb' or connect from VSCode." 1>&2
 	$(QEMU) -serial mon:stdio $(QEMUOPTS) -S $(QEMUGDB)
 
-qemu-nox-gdb: fs.img xv6.img .gdbinit
-	@echo "*** Now run 'gdb'." 1>&2
-	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
-
-qemu-vscode: kernel fs.img xv6.img launch.json
-	@echo "*** Now attach to qemu in the debug console ofb vscode." 1>&2
-	@echo "file kernel" > .gdbinit
-	$(QEMU) -serial mon:stdio $(QEMUOPTS) -S $(QEMUGDB)
-
-qemu-nox-vscode: kernel fs.img xv6.img launch.json
-	@echo "*** Now attach to qemu in the debug console ofb vscode." 1>&2
-	@echo "file kernel" > .gdbinit
+qemu-nox-gdb: fs.img xv6.img .gdbinit launch.json
+	@echo "*** Now run 'gdb' or connect from VSCode." 1>&2
 	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
 
 # CUT HERE

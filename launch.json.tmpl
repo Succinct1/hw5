@@ -9,9 +9,15 @@
       "target": "localhost:1234",
       "remote": true,
       "cwd": "${workspaceRoot}",
+      "debugger_args": [
+        "-nx", // don't auto-load .gdbinit
+      ],
+      "stopAtConnect": true,
       "autorun": [
-        "set substitute-path /root ."
-      ]
+        "set substitute-path /root .",
+        "source .gdbinit.vscode",
+        "echo Continue with 'c' or 'continue'",
+      ],
     }
   ]
 }

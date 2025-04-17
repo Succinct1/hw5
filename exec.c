@@ -19,6 +19,11 @@ exec(char *path, char **argv)
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
 
+  // remove \n from path - fixes a bug that shows up sometimes which affects dirlookup
+  for(s = path; *s; s++)
+    if(*s == '\n')
+      *s = 0;
+  
   begin_op();
 
   if((ip = namei(path)) == 0){

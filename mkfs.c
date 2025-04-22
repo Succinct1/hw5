@@ -261,6 +261,7 @@ iappend(uint inum, void *xp, int n)
   char buf[BSIZE];
   uint indirect[NINDIRECT];
   uint x;
+  uint sec, bn;
 
   rinode(inum, &din);
   off = xint(din.size);
@@ -278,11 +279,49 @@ iappend(uint inum, void *xp, int n)
         din.addrs[NDIRECT] = xint(freeblock++);
       }
       rsect(xint(din.addrs[NDIRECT]), (char*)indirect);
-      if(indirect[fbn - NDIRECT] == 0){
-        indirect[fbn - NDIRECT] = xint(freeblock++);
-        wsect(xint(din.addrs[NDIRECT]), (char*)indirect);
-      }
-      x = xint(indirect[fbn-NDIRECT]);
+      indirect[0] = 0;
+      wsect(xint(din.addrs[NDIRECT]), (char*)indirect);
+
+      
+      sec = din.addrs[NDIRECT]; 
+
+      // shift back by direct blocks, skip 0
+      bn = fbn + 1 - NDIRECT;
+      
+      do{
+        
+        printf("fbn:%d, sec:%d\n", bn, xint(sec)); 
+        
+        if(bn < NINDIRECT) {
+          // 1st iter: if it fits within the first indirect table, we're done
+          // nth iter: if it fits within the nth indirect table, we're done
+          
+          if(indirect[bn] == 0){
+            indirect[bn] = xint(freeblock++);
+            wsect(xint(sec), (char*)indirect);
+          }
+          x = xint(indirect[bn]);
+          break;     
+          
+        } else {
+          // 1st iter: if it does not fit within the first indirect table
+          // nth iter: if it does not fit within the nth indirect table
+          if(indirect[0] == 0) {
+            // allocate the next indirect table
+            indirect[0] = xint(freeblock++);
+            wsect(xint(sec), (char*)indirect);
+          }
+          sec = indirect[0];
+          rsect(xint(sec), (char*)indirect);
+          indirect[0] = 0;
+          // set new indirect table pointer to 0
+          wsect(xint(sec), (char*)indirect);
+          
+          bn -= 127; // shift back by 127 so we have 1th index into new indirect  table and then loop back
+            
+        }  
+          
+      } while (1);
     }
     n1 = min(n, (fbn + 1) * BSIZE - off);
     rsect(x, buf);

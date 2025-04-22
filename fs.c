@@ -375,28 +375,48 @@ bmap(struct inode *ip, uint bn)
   uint addr, *a;
   struct buf *bp;
 
+  // 1) Direct blocks
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr = balloc(ip->dev);
     return addr;
   }
-  bn -= NDIRECT;
 
-  if(bn < NINDIRECT){
-    // Load indirect block, allocating if necessary.
-    if((addr = ip->addrs[NDIRECT]) == 0)
-      ip->addrs[NDIRECT] = addr = balloc(ip->dev);
-    bp = bread(ip->dev, addr);
-    a = (uint*)bp->data;
-    if((addr = a[bn]) == 0){
-      a[bn] = addr = balloc(ip->dev);
+  // 2) Single‑indirect (head of list)
+  bn -= NDIRECT;
+  if(ip->addrs[NDIRECT] == 0)
+    ip->addrs[NDIRECT] = balloc(ip->dev);
+
+  // Number of data pointers per list block
+  const uint per_block = NINDIRECT - 1;
+  uint list_blk = ip->addrs[NDIRECT];
+
+  // 3) Traverse list until we find the block containing bn
+  while(bn >= per_block){
+    bp = bread(ip->dev, list_blk);
+    a  = (uint*)bp->data;
+
+    // Allocate next list block if needed
+    if(a[0] == 0) {
+      a[0] = balloc(ip->dev);
       log_write(bp);
     }
+    list_blk = a[0];
     brelse(bp);
-    return addr;
+    bn -= per_block;
   }
 
-  panic("bmap: out of range");
+  // 4) Now bn is within [0 .. per_block-1] in this block
+  bp = bread(ip->dev, list_blk);
+  a  = (uint*)bp->data;
+  uint idx = bn + 1;          // slot 0 is "next" pointer
+  if(a[idx] == 0){
+    a[idx] = balloc(ip->dev);
+    log_write(bp);
+  }
+  addr = a[idx];
+  brelse(bp);
+  return addr;
 }
 
 // Truncate inode (discard contents).

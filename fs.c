@@ -372,32 +372,64 @@ iunlockput(struct inode *ip)
 static uint
 bmap(struct inode *ip, uint bn)
 {
-  uint addr, *a;
+  uint dev = ip->dev;
   struct buf *bp;
+  uint addr;
 
+  // direct blocks
   if(bn < NDIRECT){
-    if((addr = ip->addrs[bn]) == 0)
-      ip->addrs[bn] = addr = balloc(ip->dev);
-    return addr;
+    if(ip->addrs[bn] == 0){
+      ip->addrs[bn] = alloc_block(dev);
+      iupdate(ip);
+    }
+    return ip->addrs[bn];
   }
-  bn -= NDIRECT;
 
-  if(bn < NINDIRECT){
-    // Load indirect block, allocating if necessary.
-    if((addr = ip->addrs[NDIRECT]) == 0)
-      ip->addrs[NDIRECT] = addr = balloc(ip->dev);
-    bp = bread(ip->dev, addr);
-    a = (uint*)bp->data;
-    if((addr = a[bn]) == 0){
-      a[bn] = addr = balloc(ip->dev);
+  bn -= NDIRECT;  
+  if(ip->addrs[NDIRECT] == 0){
+    // allocate head of list
+    ip->addrs[NDIRECT] = alloc_block(dev);
+    // initialize it to zeros
+    bp = bread(dev, ip->addrs[NDIRECT]);
+    memset(bp->data, 0, BSIZE);
+    log_write(bp);
+    brelse(bp);
+    iupdate(ip);
+  }
+
+  // Walk list
+  addr = ip->addrs[NDIRECT];
+  while(bn >= (NINDIRECT - 1)){
+    bp = bread(dev, addr);
+    uint *tbl = (uint*)bp->data;
+    if(tbl[0] == 0){
+      tbl[0] = alloc_block(dev);
+      // zero new page
+      struct buf *nb = bread(dev, tbl[0]);
+      memset(nb->data, 0, BSIZE);
+      log_write(nb);
+      brelse(nb);
+
       log_write(bp);
     }
     brelse(bp);
-    return addr;
+    addr = tbl[0];
+    bn  -= (NINDIRECT - 1);
   }
 
-  panic("bmap: out of range");
+  // our data pointer is slot bn+1
+  bp = bread(dev, addr);
+  uint *tbl = (uint*)bp->data;
+  if(tbl[bn+1] == 0){
+    tbl[bn+1] = alloc_block(dev);
+    log_write(bp);
+  }
+  addr = tbl[bn+1];
+  brelse(bp);
+
+  return addr;
 }
+
 
 // Truncate inode (discard contents).
 // Only called when the inode has no links
